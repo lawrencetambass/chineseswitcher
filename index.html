@@ -3,193 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>繁簡中文轉換與編碼工具</title>
-    <!-- 使用開源轉換庫 CDN (OpenCC-JS) -->
+    <title>繁簡轉換與批次取代工具</title>
     <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
-        .container {
-            max-width: 1000px;
-        }
-        textarea {
-            resize: vertical;
-            min-height: 250px;
-        }
+        .sidebar-transition { transition: transform 0.3s ease-in-out; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        textarea { resize: none; }
     </style>
 </head>
-<body>
+<body class="flex flex-col min-h-screen">
 
-<div class="container mx-auto px-4 py-8">
-    <header class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-slate-800 mb-2">繁簡中文轉換工具</h1>
-        <p class="text-slate-600">支援精準繁簡互轉、字數統計及多編碼位元組預估</p>
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 px-6 py-3 sticky top-0 z-40 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="text-blue-600 text-2xl font-bold">📝</div>
+            <div>
+                <h1 class="text-lg font-bold text-slate-800 leading-none">繁簡轉換與批次取代</h1>
+                <p class="text-xs text-slate-500 mt-1">精準轉換 + 自定義規則</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="toggleBulkPanel()" class="text-slate-600 hover:bg-slate-100 px-3 py-2 rounded-lg text-sm font-medium transition">
+                管理取代規則
+            </button>
+            <button onclick="copyText()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium text-sm transition shadow-sm">
+                複製結果
+            </button>
+        </div>
     </header>
 
-    <div class="bg-white rounded-xl shadow-md p-6">
-        <!-- 工具列 -->
-        <div class="flex flex-wrap gap-2 mb-4">
-            <button onclick="handleConvert('s2t')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition font-medium">簡體轉繁體</button>
-            <button onclick="handleConvert('t2s')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition font-medium">繁體轉簡體</button>
-            <button onclick="clearAll()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg transition">清空</button>
-            <button onclick="copyText()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition">複製</button>
-            <button onclick="downloadTxt()" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition">下載 .txt</button>
-        </div>
+    <div class="flex flex-grow relative overflow-hidden">
+        <!-- Main Content -->
+        <main class="flex-grow p-4 lg:p-8 overflow-y-auto">
+            <div class="max-w-6xl mx-auto space-y-4">
+                
+                <!-- 功能按鈕區 -->
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <button onclick="handleConvert('s2t')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">簡轉繁 (OpenCC)</button>
+                    <button onclick="handleConvert('t2s')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">繁轉簡 (OpenCC)</button>
+                    <button onclick="performReplacer()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">套用取代規則</button>
+                    <div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
+                    <button onclick="clearAll()" class="text-slate-500 hover:bg-slate-100 px-4 py-2 rounded-lg text-sm transition">清空內容</button>
+                    <button onclick="downloadTxt()" class="text-slate-500 hover:bg-slate-100 px-4 py-2 rounded-lg text-sm transition">下載 .txt</button>
+                </div>
 
-        <!-- 輸入區域 -->
-        <div class="relative">
-            <textarea id="mainInput" class="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-lg leading-relaxed" placeholder="請在此輸入或貼上需要轉換的文字..."></textarea>
+                <!-- 編輯區 -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-[600px]">
+                    <div class="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-slate-200">
+                        <div class="bg-slate-50 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">輸入內容</div>
+                        <textarea id="mainInput" class="flex-grow p-4 outline-none text-slate-700 text-lg leading-relaxed" placeholder="在此貼上文字..."></textarea>
+                    </div>
+                    <div id="stats" class="bg-slate-50 px-4 py-3 text-xs text-slate-500 flex flex-wrap gap-4 md:hidden border-b border-slate-200">
+                        <span>字數: <b id="mCharCount">0</b></span>
+                        <span>UTF8: <b id="mUtf8Size">0</b></span>
+                    </div>
+                    <div class="hidden md:flex w-48 bg-slate-50 p-4 flex-col gap-4 text-xs border-l border-slate-200">
+                        <h4 class="font-bold text-slate-400 uppercase tracking-tighter">統計資訊</h4>
+                        <div class="space-y-3">
+                            <div><p class="text-slate-400">總字數</p><p id="charCount" class="text-lg font-semibold text-slate-700">0</p></div>
+                            <div><p class="text-slate-400">UTF-8 Size</p><p id="utf8Size" class="text-sm font-medium text-slate-700">0 Bytes</p></div>
+                            <div><p class="text-slate-400">Big5/GBK</p><p id="legacySize" class="text-sm font-medium text-slate-700">0 Bytes</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Rules Sidebar (Replacer) -->
+        <aside id="bulkPanel" class="w-80 md:w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col fixed right-0 top-[65px] bottom-0 z-30 sidebar-transition translate-x-full">
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <h2 class="font-bold text-slate-700">批次取代規則</h2>
+                <button onclick="toggleBulkPanel()" class="text-slate-400 hover:text-slate-600 p-1">✕</button>
+            </div>
             
-            <div id="loading" class="hidden absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div class="flex-grow overflow-y-auto p-4 no-scrollbar space-y-3">
+                <div id="bulkList" class="space-y-3">
+                    <!-- JS Generated Rows -->
+                </div>
+                <button onclick="addNewRow()" class="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all text-sm font-medium">
+                    + 新增規則
+                </button>
             </div>
 
-            <div id="stats" class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
-                <div>總字數: <b id="charCount" class="text-slate-800">0</b></div>
-                <div>UTF-8: <b id="utf8Size" class="text-slate-800">0</b> bytes</div>
-                <div>Big5: <b id="big5Size" class="text-slate-800">0</b> bytes</div>
-                <div>GBK: <b id="gbkSize" class="text-slate-800">0</b> bytes</div>
+            <div class="p-4 border-t border-slate-200 bg-slate-50 space-y-2">
+                <button onclick="performReplacer(); toggleBulkPanel();" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-900 transition shadow-lg">
+                    執行取代
+                </button>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="resetToPreset()" class="text-slate-500 text-xs py-2 hover:bg-slate-200 rounded-lg transition">恢復預設</button>
+                    <button onclick="clearAllRules()" class="text-red-400 text-xs py-2 hover:bg-red-50 rounded-lg transition">清空規則</button>
+                </div>
             </div>
-        </div>
-
-        <!-- 提示訊息 -->
-        <div id="toast" class="invisible fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-2 rounded-full shadow-lg transition-all">
-            已複製到剪貼簿
-        </div>
+        </aside>
     </div>
 
-    <!-- 說明與編碼對照 -->
-    <div class="mt-8 grid md:grid-cols-2 gap-6">
-        <div class="bg-white p-6 rounded-xl border border-slate-200">
-            <h3 class="font-bold text-slate-800 mb-3 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="id-card"></path></svg>
-                功能說明
-            </h3>
-            <ul class="text-sm text-slate-600 space-y-2">
-                <li class="flex items-start"><span class="mr-2">•</span>採用 OpenCC 字典，精準處理一字多義（如：發/髮、幹/乾）。</li>
-                <li class="flex items-start"><span class="mr-2">•</span>支援大篇幅文本處理。</li>
-                <li class="flex items-start"><span class="mr-2">•</span>即時計算不同中文編碼環境下的儲存大小。</li>
-            </ul>
-        </div>
-        <div class="bg-white p-6 rounded-xl border border-slate-200">
-            <h3 class="font-bold text-slate-800 mb-3 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="database"></path></svg>
-                編碼參考
-            </h3>
-            <div class="text-xs space-y-2">
-                <div class="flex justify-between border-b pb-1"><span>UTF-8</span><span class="text-slate-400">中文字 3 Bytes / 英文 1 Byte</span></div>
-                <div class="flex justify-between border-b pb-1"><span>Big5</span><span class="text-slate-400">中文字 2 Bytes (繁體)</span></div>
-                <div class="flex justify-between border-b pb-1"><span>GBK/GB2312</span><span class="text-slate-400">中文字 2 Bytes (簡體)</span></div>
-                <div class="flex justify-between"><span>UTF-16</span><span class="text-slate-400">幾乎所有字元均為 2 Bytes</span></div>
-            </div>
-        </div>
+    <!-- Toast -->
+    <div id="toast" class="invisible fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-2 rounded-full text-sm transition-all z-50 shadow-xl">
+        Action executed
     </div>
-</div>
 
-<script>
-    const inputArea = document.getElementById('mainInput');
-    const loading = document.getElementById('loading');
+    <script>
+        // --- 核心變數 ---
+        const inputArea = document.getElementById('mainInput');
+        const DEFAULT_RULES = [
+            { find: '只', replace: '隻' },
+            { find: '噉', replace: '咁' },
+            { find: '𠮶', replace: '嗰' },
+            { find: '系', replace: '係' },
+            { find: '啊', replace: '呀' },
+            { find: '咗', replace: '左' }
+        ];
+        let bulkItems = [...DEFAULT_RULES];
 
-    // 初始化轉換器 (使用 OpenCC-JS)
-    const s2tConverter = OpenCC.Converter({ from: 'cn', to: 'tw' }); // 簡體到台灣繁體
-    const t2sConverter = OpenCC.Converter({ from: 'tw', to: 'cn' }); // 台灣繁體到簡體
+        // --- OpenCC 轉換器初始化 ---
+        const s2tConverter = OpenCC.Converter({ from: 'cn', to: 'tw' });
+        const t2sConverter = OpenCC.Converter({ from: 'tw', to: 'cn' });
 
-    function updateStats() {
-        const text = inputArea.value;
-        const charCount = text.length;
-        
-        let utf8 = 0;
-        let legacy = 0; // 模擬 Big5 / GBK (非 ASCII 均視為 2 bytes)
-        
-        for (let i = 0; i < text.length; i++) {
-            const code = text.charCodeAt(i);
-            if (code <= 0x7f) {
-                utf8 += 1;
-                legacy += 1;
-            } else if (code <= 0x7ff) {
-                utf8 += 2;
-                legacy += 2;
-            } else if (code >= 0xd800 && code <= 0xdbff) {
-                // Surrogate pair (4 bytes in UTF-8, 2/4 bytes in legacy)
-                utf8 += 4;
-                legacy += 2;
-                i++; 
-            } else {
-                utf8 += 3;
-                legacy += 2;
-            }
+        // --- UI 渲染 ---
+        function renderBulkList() {
+            const container = document.getElementById('bulkList');
+            container.innerHTML = '';
+            bulkItems.forEach((item, index) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-2 group animate-in fade-in duration-200';
+                row.innerHTML = `
+                    <div class="flex-grow grid grid-cols-2 gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                        <input type="text" value="${item.find}" onchange="updateItem(${index}, 'find', this.value)" placeholder="尋找" class="bg-white text-xs p-2 rounded border-none outline-none focus:ring-1 focus:ring-blue-400">
+                        <input type="text" value="${item.replace}" onchange="updateItem(${index}, 'replace', this.value)" placeholder="取代" class="bg-white text-xs p-2 rounded border-none outline-none focus:ring-1 focus:ring-blue-400">
+                    </div>
+                    <button onclick="deleteRow(${index})" class="text-slate-300 hover:text-red-500 transition-colors">✕</button>
+                `;
+                container.appendChild(row);
+            });
         }
 
-        document.getElementById('charCount').innerText = charCount.toLocaleString();
-        document.getElementById('utf8Size').innerText = utf8.toLocaleString();
-        document.getElementById('big5Size').innerText = legacy.toLocaleString();
-        document.getElementById('gbkSize').innerText = legacy.toLocaleString();
-    }
+        function updateItem(index, key, value) { bulkItems[index][key] = value; }
+        function addNewRow() { bulkItems.push({ find: '', replace: '' }); renderBulkList(); }
+        function deleteRow(index) { bulkItems.splice(index, 1); renderBulkList(); }
+        function clearAllRules() { bulkItems = []; renderBulkList(); }
+        function resetToPreset() { bulkItems = [...DEFAULT_RULES]; renderBulkList(); showToast("已恢復預設規則"); }
+        function toggleBulkPanel() { document.getElementById('bulkPanel').classList.toggle('translate-x-full'); }
 
-    inputArea.addEventListener('input', updateStats);
-
-    async function handleConvert(mode) {
-        const text = inputArea.value;
-        if (!text) return;
-
-        loading.classList.remove('hidden');
-        
-        // 使用 setTimeout 確保 UI loading 動畫能顯示
-        setTimeout(() => {
+        // --- 核心邏輯 ---
+        function handleConvert(mode) {
+            const text = inputArea.value;
+            if (!text) return;
             try {
-                const result = mode === 's2t' ? s2tConverter(text) : t2sConverter(text);
-                inputArea.value = result;
+                inputArea.value = mode === 's2t' ? s2tConverter(text) : t2sConverter(text);
                 updateStats();
-            } catch (err) {
-                console.error("轉換錯誤:", err);
-            } finally {
-                loading.classList.add('hidden');
+                showToast(mode === 's2t' ? "已轉換為繁體" : "已轉換為簡體");
+            } catch (e) { console.error(e); }
+        }
+
+        function performReplacer() {
+            let text = inputArea.value;
+            if (!text) return;
+            bulkItems.forEach(item => {
+                if (item.find) {
+                    const escaped = item.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    text = text.replace(new RegExp(escaped, 'g'), item.replace);
+                }
+            });
+            inputArea.value = text;
+            updateStats();
+            showToast("取代規則套用成功");
+        }
+
+        function updateStats() {
+            const text = inputArea.value;
+            let utf8 = 0; let legacy = 0;
+            for (let i = 0; i < text.length; i++) {
+                const code = text.charCodeAt(i);
+                if (code <= 0x7f) { utf8 += 1; legacy += 1; }
+                else { utf8 += 3; legacy += 2; }
             }
-        }, 10);
-    }
+            document.getElementById('charCount').innerText = text.length.toLocaleString();
+            document.getElementById('mCharCount').innerText = text.length.toLocaleString();
+            document.getElementById('utf8Size').innerText = utf8.toLocaleString() + " Bytes";
+            document.getElementById('mUtf8Size').innerText = utf8.toLocaleString();
+            document.getElementById('legacySize').innerText = legacy.toLocaleString() + " Bytes";
+        }
 
-    function clearAll() {
-        inputArea.value = "";
-        updateStats();
-    }
+        inputArea.addEventListener('input', updateStats);
 
-    function copyText() {
-        if (!inputArea.value) return;
-        inputArea.select();
-        try {
+        // --- 功能小工具 ---
+        function copyText() {
+            inputArea.select();
             document.execCommand('copy');
             showToast("已複製到剪貼簿");
-        } catch (err) {
-            console.error('複製失敗');
         }
-    }
 
-    function showToast(msg) {
-        const toast = document.getElementById('toast');
-        toast.innerText = msg;
-        toast.classList.remove('invisible');
-        toast.classList.add('opacity-100');
-        setTimeout(() => {
-            toast.classList.add('invisible');
-            toast.classList.remove('opacity-100');
-        }, 2000);
-    }
+        function clearAll() { inputArea.value = ""; updateStats(); }
 
-    function downloadTxt() {
-        const text = inputArea.value;
-        if (!text) return;
-        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `converted_${new Date().getTime()}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-</script>
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.remove('invisible');
+            t.classList.add('opacity-100');
+            setTimeout(() => { t.classList.add('invisible'); t.classList.remove('opacity-100'); }, 2000);
+        }
 
+        function downloadTxt() {
+            const blob = new Blob([inputArea.value], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `output_${Date.now()}.txt`; a.click();
+        }
+
+        window.onload = () => { renderBulkList(); updateStats(); };
+    </script>
 </body>
 </html>
