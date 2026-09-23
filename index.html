@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>繁簡轉換與批次取代工具</title>
+    <!-- Load OpenCC JS library for simplified/traditional Chinese conversion -->
     <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+    <!-- Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -12,8 +14,11 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: #f8fafc;
         }
+        /* Custom transition class for the sidebar panel */
         .sidebar-transition { transition: transform 0.3s ease-in-out; }
+        /* Hide scrollbar for a cleaner look in specific areas */
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        /* Prevent textarea resizing */
         textarea { resize: none; }
     </style>
 </head>
@@ -29,9 +34,11 @@
             </div>
         </div>
         <div class="flex items-center gap-2">
+            <!-- Button to toggle the replacement rules sidebar -->
             <button onclick="toggleBulkPanel()" class="text-slate-600 hover:bg-slate-100 px-3 py-2 rounded-lg text-sm font-medium transition">
                 管理取代規則
             </button>
+            <!-- Button to copy the content to clipboard -->
             <button onclick="copyText()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium text-sm transition shadow-sm">
                 複製結果
             </button>
@@ -43,7 +50,7 @@
         <main class="flex-grow p-4 lg:p-8 overflow-y-auto">
             <div class="max-w-6xl mx-auto space-y-4">
                 
-                <!-- 功能按鈕區 -->
+                <!-- 功能按鈕區 (Function Buttons Area) -->
                 <div class="flex flex-wrap gap-2 mb-2">
                     <button onclick="handleConvert('s2t')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">簡轉繁 (OpenCC)</button>
                     <button onclick="handleConvert('t2s')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">繁轉簡 (OpenCC)</button>
@@ -53,16 +60,19 @@
                     <button onclick="downloadTxt()" class="text-slate-500 hover:bg-slate-100 px-4 py-2 rounded-lg text-sm transition">下載 .txt</button>
                 </div>
 
-                <!-- 編輯區 -->
+                <!-- 編輯區 (Editing Area) -->
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-[600px]">
                     <div class="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-slate-200">
                         <div class="bg-slate-50 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">輸入內容</div>
+                        <!-- Main text input area -->
                         <textarea id="mainInput" class="flex-grow p-4 outline-none text-slate-700 text-lg leading-relaxed" placeholder="在此貼上文字..."></textarea>
                     </div>
+                    <!-- Mobile statistics display -->
                     <div id="stats" class="bg-slate-50 px-4 py-3 text-xs text-slate-500 flex flex-wrap gap-4 md:hidden border-b border-slate-200">
                         <span>字數: <b id="mCharCount">0</b></span>
                         <span>UTF8: <b id="mUtf8Size">0</b></span>
                     </div>
+                    <!-- Desktop statistics display sidebar -->
                     <div class="hidden md:flex w-48 bg-slate-50 p-4 flex-col gap-4 text-xs border-l border-slate-200">
                         <h4 class="font-bold text-slate-400 uppercase tracking-tighter">統計資訊</h4>
                         <div class="space-y-3">
@@ -79,18 +89,22 @@
         <aside id="bulkPanel" class="w-80 md:w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col fixed right-0 top-[65px] bottom-0 z-30 sidebar-transition translate-x-full">
             <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                 <h2 class="font-bold text-slate-700">批次取代規則</h2>
+                <!-- Close button for the sidebar -->
                 <button onclick="toggleBulkPanel()" class="text-slate-400 hover:text-slate-600 p-1">✕</button>
             </div>
             
             <div class="flex-grow overflow-y-auto p-4 no-scrollbar space-y-3">
+                <!-- Container for dynamically generated rule rows -->
                 <div id="bulkList" class="space-y-3">
                     <!-- JS Generated Rows -->
                 </div>
+                <!-- Button to add a new empty rule row -->
                 <button onclick="addNewRow()" class="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all text-sm font-medium">
                     + 新增規則
                 </button>
             </div>
 
+            <!-- Action buttons at the bottom of the sidebar -->
             <div class="p-4 border-t border-slate-200 bg-slate-50 space-y-2">
                 <button onclick="performReplacer(); toggleBulkPanel();" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-900 transition shadow-lg">
                     執行取代
@@ -103,41 +117,52 @@
         </aside>
     </div>
 
-    <!-- Toast -->
+    <!-- Toast notification element -->
     <div id="toast" class="invisible fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-2 rounded-full text-sm transition-all z-50 shadow-xl">
         Action executed
     </div>
 
     <script>
-        // --- 核心變數 ---
+        // --- 核心變數 (Core Variables) ---
         const inputArea = document.getElementById('mainInput');
+        
+        // Define default replacement rules, now including the user-requested additions
         const DEFAULT_RULES = [
             { find: '只', replace: '隻' },
             { find: '噉', replace: '咁' },
             { find: '𠮶', replace: '嗰' },
             { find: '系', replace: '係' },
             { find: '啊', replace: '呀' },
-            { find: '咯', replace: ‘囉’ },
-            { find: '㖞', replace: ‘喎’ },
-            { find: '恁', replace: ‘諗’ },
-            { find: '咧', replace: ‘呢’ },
-            { find: '繫', replace: ‘係’ },
-            { find: '哇', replace: ‘嘩’ },
+            { find: '咗', replace: '左' },
+            // Newly added rules
+            { find: '咯', replace: '囉' },
+            { find: '㖞', replace: '喎' },
+            { find: '恁', replace: '諗' },
+            { find: '咧', replace: '呢' },
+            { find: '繫', replace: '係' },
+            { find: '哇', replace: '嘩' },
             { find: '左', replace: '咗' }
         ];
+        
+        // Initialize active rules with the default set
         let bulkItems = [...DEFAULT_RULES];
 
-        // --- OpenCC 轉換器初始化 ---
+        // --- OpenCC 轉換器初始化 (OpenCC Converter Initialization) ---
         const s2tConverter = OpenCC.Converter({ from: 'cn', to: 'tw' });
         const t2sConverter = OpenCC.Converter({ from: 'tw', to: 'cn' });
 
-        // --- UI 渲染 ---
+        // --- UI 渲染 (UI Rendering) ---
+        
+        // Renders the list of replacement rules in the sidebar
         function renderBulkList() {
             const container = document.getElementById('bulkList');
-            container.innerHTML = '';
+            container.innerHTML = ''; // Clear existing content
+            
             bulkItems.forEach((item, index) => {
                 const row = document.createElement('div');
                 row.className = 'flex items-center gap-2 group animate-in fade-in duration-200';
+                
+                // Create HTML for each rule row with input fields and a delete button
                 row.innerHTML = `
                     <div class="flex-grow grid grid-cols-2 gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
                         <input type="text" value="${item.find}" onchange="updateItem(${index}, 'find', this.value)" placeholder="尋找" class="bg-white text-xs p-2 rounded border-none outline-none focus:ring-1 focus:ring-blue-400">
@@ -149,46 +174,79 @@
             });
         }
 
+        // Updates a specific item in the bulkItems array when input changes
         function updateItem(index, key, value) { bulkItems[index][key] = value; }
+        
+        // Adds a new empty rule to the list
         function addNewRow() { bulkItems.push({ find: '', replace: '' }); renderBulkList(); }
+        
+        // Removes a rule from the list
         function deleteRow(index) { bulkItems.splice(index, 1); renderBulkList(); }
+        
+        // Clears all rules
         function clearAllRules() { bulkItems = []; renderBulkList(); }
+        
+        // Resets the rules to the predefined default set
         function resetToPreset() { bulkItems = [...DEFAULT_RULES]; renderBulkList(); showToast("已恢復預設規則"); }
+        
+        // Toggles the visibility of the sidebar panel
         function toggleBulkPanel() { document.getElementById('bulkPanel').classList.toggle('translate-x-full'); }
 
-        // --- 核心邏輯 ---
+        // --- 核心邏輯 (Core Logic) ---
+        
+        // Handles OpenCC conversion between simplified and traditional
         function handleConvert(mode) {
             const text = inputArea.value;
             if (!text) return;
             try {
+                // Apply conversion based on the selected mode
                 inputArea.value = mode === 's2t' ? s2tConverter(text) : t2sConverter(text);
                 updateStats();
                 showToast(mode === 's2t' ? "已轉換為繁體" : "已轉換為簡體");
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error("Conversion error:", e); 
+            }
         }
 
+        // Applies the active replacement rules to the text content
         function performReplacer() {
             let text = inputArea.value;
             if (!text) return;
+            
+            // Iterate through each rule and perform global replacement
             bulkItems.forEach(item => {
                 if (item.find) {
+                    // Escape special regex characters in the 'find' string
                     const escaped = item.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     text = text.replace(new RegExp(escaped, 'g'), item.replace);
                 }
             });
+            
             inputArea.value = text;
             updateStats();
             showToast("取代規則套用成功");
         }
 
+        // Calculates and updates text statistics (character count, byte sizes)
         function updateStats() {
             const text = inputArea.value;
-            let utf8 = 0; let legacy = 0;
+            let utf8 = 0; 
+            let legacy = 0;
+            
+            // Calculate approximate byte sizes based on character codes
             for (let i = 0; i < text.length; i++) {
                 const code = text.charCodeAt(i);
-                if (code <= 0x7f) { utf8 += 1; legacy += 1; }
-                else { utf8 += 3; legacy += 2; }
+                if (code <= 0x7f) { 
+                    utf8 += 1; 
+                    legacy += 1; 
+                }
+                else { 
+                    utf8 += 3; 
+                    legacy += 2; 
+                }
             }
+            
+            // Update UI elements with formatting
             document.getElementById('charCount').innerText = text.length.toLocaleString();
             document.getElementById('mCharCount').innerText = text.length.toLocaleString();
             document.getElementById('utf8Size').innerText = utf8.toLocaleString() + " Bytes";
@@ -196,33 +254,60 @@
             document.getElementById('legacySize').innerText = legacy.toLocaleString() + " Bytes";
         }
 
+        // Attach event listener to update stats as user types
         inputArea.addEventListener('input', updateStats);
 
-        // --- 功能小工具 ---
+        // --- 功能小工具 (Utility Functions) ---
+        
+        // Copies text area content to clipboard
         function copyText() {
             inputArea.select();
             document.execCommand('copy');
+            // Unselect text after copying for better UX
+            window.getSelection().removeAllRanges();
             showToast("已複製到剪貼簿");
         }
 
-        function clearAll() { inputArea.value = ""; updateStats(); }
+        // Clears text area content
+        function clearAll() { 
+            inputArea.value = ""; 
+            updateStats(); 
+        }
 
+        // Displays a temporary toast notification message
         function showToast(msg) {
             const t = document.getElementById('toast');
             t.innerText = msg;
             t.classList.remove('invisible');
             t.classList.add('opacity-100');
-            setTimeout(() => { t.classList.add('invisible'); t.classList.remove('opacity-100'); }, 2000);
+            // Hide toast after 2 seconds
+            setTimeout(() => { 
+                t.classList.add('invisible'); 
+                t.classList.remove('opacity-100'); 
+            }, 2000);
         }
 
+        // Triggers a download of the current text as a .txt file
         function downloadTxt() {
-            const blob = new Blob([inputArea.value], { type: "text/plain;charset=utf-8" });
+            const text = inputArea.value;
+            if(!text) {
+                showToast("沒有內容可以下載");
+                return;
+            }
+            const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = url; a.download = `output_${Date.now()}.txt`; a.click();
+            a.href = url; 
+            a.download = `output_${Date.now()}.txt`; 
+            a.click();
+            URL.revokeObjectURL(url); // Clean up memory
         }
 
-        window.onload = () => { renderBulkList(); updateStats(); };
+        // Initialize UI on window load
+        window.onload = () => { 
+            renderBulkList(); 
+            updateStats(); 
+        };
     </script>
 </body>
 </html>
